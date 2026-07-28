@@ -7,31 +7,43 @@ pipeline {
     }
 
     stages {
+
         stage('Build') {
             steps {
-                sh 'docker build -t $REGISTRY/$IMAGE:$BUILD_NUMBER .'
+                container('docker') {
+                    sh '''
+                    docker --version
+                    docker build -t $REGISTRY/$IMAGE:$BUILD_NUMBER .
+                    '''
+                }
             }
         }
 
         stage('Login') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'harbor-jenkins',
-                    usernameVariable: 'HARBOR_USER',
-                    passwordVariable: 'HARBOR_PASS'
-                )]) {
-                    sh '''
-                    echo "$HARBOR_PASS" | docker login $REGISTRY \
-                      --username "$HARBOR_USER" \
-                      --password-stdin
-                    '''
+                container('docker') {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'harbor-creds',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )]) {
+                        sh '''
+                        echo "$HARBOR_PASS" | docker login $REGISTRY \
+                        --username "$HARBOR_USER" \
+                        --password-stdin
+                        '''
+                    }
                 }
             }
         }
 
         stage('Push') {
             steps {
-                sh 'docker push $REGISTRY/$IMAGE:$BUILD_NUMBER'
+                container('docker') {
+                    sh '''
+                    docker push $REGISTRY/$IMAGE:$BUILD_NUMBER
+                    '''
+                }
             }
         }
     }
