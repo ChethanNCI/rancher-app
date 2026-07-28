@@ -1,78 +1,38 @@
 pipeline {
     agent any
 
-    stages {
-
-        stage('Checkout Test') {
-            steps {
-                echo 'Starting Jenkins build test...'
-                echo 'Repository checkout successful'
-            }
-        }
-
-        stage('Environment Check') {
-            steps {
-                sh '''
-                    echo "Checking Jenkins environment"
-                    echo "Current user:"
-                    whoami
-                    echo "Current directory:"
-                    pwd
-                    echo "Files:"
-                    ls -la
-                '''
-            }
-        }
-
-        stage('Build Test') {
-            steps {
-                echo 'Running sample build process...'
-
-                sh '''
-                    echo "Compiling application..."
-                    sleep 5
-                    echo "Build completed successfully"
-                '''
-            }
-        }
-
-        stage('Unit Test') {
-            steps {
-                echo 'Running unit tests...'
-
-                sh '''
-                    echo "Executing test cases..."
-                    sleep 3
-                    echo "All tests passed"
-                '''
-            }
-        }
-
-        stage('Deployment Simulation') {
-            steps {
-                echo 'Simulating deployment...'
-
-                sh '''
-                    echo "Deploying application..."
-                    sleep 3
-                    echo "Deployment completed"
-                '''
-            }
-        }
+    environment {
+        REGISTRY = "44.202.77.70:30002"
+        IMAGE = "rancher/myapp"
     }
 
-    post {
-
-        success {
-            echo '✅ Jenkins pipeline completed successfully!'
+    stages {
+        stage('Build') {
+            steps {
+                sh 'docker build -t $REGISTRY/$IMAGE:$BUILD_NUMBER .'
+            }
         }
 
-        failure {
-            echo '❌ Jenkins pipeline failed!'
+        stage('Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'harbor-jenkins',
+                    usernameVariable: 'HARBOR_USER',
+                    passwordVariable: 'HARBOR_PASS'
+                )]) {
+                    sh '''
+                    echo "$HARBOR_PASS" | docker login $REGISTRY \
+                      --username "$HARBOR_USER" \
+                      --password-stdin
+                    '''
+                }
+            }
         }
 
-        always {
-            echo 'Pipeline execution finished.'
+        stage('Push') {
+            steps {
+                sh 'docker push $REGISTRY/$IMAGE:$BUILD_NUMBER'
+            }
         }
     }
 }
