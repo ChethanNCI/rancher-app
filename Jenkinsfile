@@ -9,7 +9,7 @@ pipeline {
         REGISTRY = "44.202.77.70:30002"
         IMAGE = "rancher/myapp"
         DEPLOYMENT = "rancher-apps"
-        NAMESPACE = "rancher-app-dev"
+        NAMESPACE = "default"
     }
 
     stages {
