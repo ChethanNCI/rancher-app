@@ -8,6 +8,8 @@ pipeline {
     environment {
         REGISTRY = "44.202.77.70:30002"
         IMAGE = "rancher/myapp"
+        DEPLOYMENT = "rancher-apps"
+        NAMESPACE = "rancher-app-dev"
     }
 
     stages {
@@ -39,7 +41,6 @@ EOF
             }
         }
 
-
         stage('Build and Push') {
             steps {
                 sh '''
@@ -49,6 +50,21 @@ EOF
                   --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
                   --insecure
                 '''
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    sh """
+                    kubectl set image deployment/${DEPLOYMENT} \
+                    rancher-apps=${REGISTRY}/${IMAGE}:${BUILD_NUMBER} \
+                    -n ${NAMESPACE}
+
+                    kubectl rollout status deployment/${DEPLOYMENT} \
+                    -n ${NAMESPACE}
+                    """
+                }
             }
         }
     }
