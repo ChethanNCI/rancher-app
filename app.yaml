@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rancher-apps
+  labels:
+    app: rancher-apps
+    env: dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rancher-apps
+  template:
+    metadata:
+      labels:
+        app: rancher-apps
+    spec:
+      containers:
+        - name: rancher-apps
+          image: 44.202.77.70:30002/rancher/myapp:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rancher-apps-service
+spec:
+  type: NodePort
+  selector:
+    app: rancher-apps
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 31080
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rancher-apps-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rancher-apps
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
