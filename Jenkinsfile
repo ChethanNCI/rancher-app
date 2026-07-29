@@ -1,37 +1,71 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            defaultContainer 'kaniko'
+        }
+    }
 
     environment {
         REGISTRY = "44.202.77.70:30002"
         IMAGE = "rancher/myapp"
+        DEPLOYMENT = "rancher-apps"
+        NAMESPACE = "rancher-app-dev"
     }
 
     stages {
-        stage('Build') {
-            steps {
-                sh 'docker build -t $REGISTRY/$IMAGE:$BUILD_NUMBER .'
-            }
-        }
 
-        stage('Login') {
+        stage('Configure Harbor Auth') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'harbor-jenkins',
-                    usernameVariable: 'HARBOR_USER',
-                    passwordVariable: 'HARBOR_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-jenkins',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )
+                ]) {
                     sh '''
-                    echo "$HARBOR_PASS" | docker login $REGISTRY \
-                      --username "$HARBOR_USER" \
-                      --password-stdin
+                    mkdir -p /kaniko/.docker
+
+                    cat > /kaniko/.docker/config.json <<EOF
+{
+  "auths": {
+    "${REGISTRY}": {
+      "username": "${HARBOR_USER}",
+      "password": "${HARBOR_PASS}"
+    }
+  }
+}
+EOF
                     '''
                 }
             }
         }
 
-        stage('Push') {
+        stage('Build and Push') {
             steps {
-                sh 'docker push $REGISTRY/$IMAGE:$BUILD_NUMBER'
+                sh '''
+                /kaniko/executor \
+                  --dockerfile=Dockerfile \
+                  --context=$WORKSPACE \
+                  --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
+                  --insecure
+                '''
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    sh """
+                    sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
+
+                    kubectl apply -f app.yaml \
+                    -n ${NAMESPACE}
+
+                    kubectl rollout status deployment/${DEPLOYMENT} \
+                    -n ${NAMESPACE}
+                    """
+                }
             }
         }
     }
