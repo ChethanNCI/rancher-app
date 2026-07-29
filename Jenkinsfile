@@ -57,8 +57,9 @@ EOF
             steps {
                 container('kubectl') {
                     sh """
-                    kubectl set image deployment/${DEPLOYMENT} \
-                    rancher-apps=${REGISTRY}/${IMAGE}:${BUILD_NUMBER} \
+                    sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
+
+                    kubectl apply -f app.yaml \
                     -n ${NAMESPACE}
 
                     kubectl rollout status deployment/${DEPLOYMENT} \
