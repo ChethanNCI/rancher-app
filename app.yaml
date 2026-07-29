@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rancher-apps
-  namespace: rancher-app-dev
+  namespace: default
   labels:
     app: rancher-apps
     env: dev
@@ -41,7 +41,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: rancher-apps-service
-  namespace: rancher-app-dev
+  namespace: default
 
 spec:
   type: NodePort
@@ -60,7 +60,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: rancher-apps-hpa
-  namespace: rancher-app-dev
+  namespace: default
 
 spec:
   scaleTargetRef:
