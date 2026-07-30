@@ -19,6 +19,7 @@ spec:
         app: rancher-apps
 
     spec:
+      serviceAccountName: jenkins
       containers:
         - name: rancher-apps
           image: 44.202.77.70:30002/rancher/myapp:BUILD_NUMBER
