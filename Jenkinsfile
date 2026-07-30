@@ -56,23 +56,10 @@ EOF
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    sh '''
-                    cd "$WORKSPACE"
-
-                    echo "Current directory:"
-                    pwd
-
-                    ls -la
-
-                   kubectl apply -f "$WORKSPACE/account.yaml"
-                   
-                   sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" "$WORKSPACE/app.yaml"
-                   
-                   kubectl apply -f "$WORKSPACE/app.yaml" -n ${NAMESPACE}
-                   
-                   kubectl rollout status deployment/${DEPLOYMENT} -n ${NAMESPACE}
-                    '''
-                }
+                   cd "$WORKSPACE" && \
+                    echo "Current directory:" && \
+                    pwd && \
+                    ls -la 
             }
         }
     }
