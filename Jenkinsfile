@@ -24,9 +24,9 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                    mkdir -p /kaniko/.docker
+                        mkdir -p /kaniko/.docker
 
-                    cat > /kaniko/.docker/config.json <<EOF
+                        cat > /kaniko/.docker/config.json <<EOF
 {
   "auths": {
     "${REGISTRY}": {
@@ -44,22 +44,37 @@ EOF
         stage('Build and Push') {
             steps {
                 sh '''
-                /kaniko/executor \
-                  --dockerfile=Dockerfile \
-                  --context=$WORKSPACE \
-                  --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
-                  --insecure
+                    /kaniko/executor \
+                      --dockerfile=Dockerfile \
+                      --context=$WORKSPACE \
+                      --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
+                      --insecure
                 '''
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Test Deploy Script') {
             steps {
                 container('kubectl') {
-                   cd "$WORKSPACE" && \
-                    echo "Current directory:" && \
-                    pwd && \
-                    ls -la 
+                    sh '''
+                        cd "$WORKSPACE"
+
+                        echo "Current directory:"
+                        pwd
+
+                        echo "Workspace contents:"
+                        ls -la
+
+                        echo "Replacing BUILD_NUMBER in app.yaml..."
+                        sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
+
+                        echo "Updated app.yaml:"
+                        cat app.yaml
+
+                        echo "Shell script executed successfully."
+                        echo "Skipping Kubernetes deployment."
+                    '''
+                }
             }
         }
     }
