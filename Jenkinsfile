@@ -57,6 +57,8 @@ EOF
             steps {
                 container('kubectl') {
                     sh """
+                    kubectl apply -f account.yaml
+                    
                     sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
 
                     kubectl apply -f app.yaml \
