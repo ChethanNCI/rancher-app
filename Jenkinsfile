@@ -56,24 +56,28 @@ EOF
         stage('Test Deploy Script') {
             steps {
                 container('kubectl') {
-                    sh '''
-                        cd "$WORKSPACE"
+                    script {
+                        def workspace = pwd()
 
-                        echo "Current directory:"
-                        pwd
+                        sh """
+                            cd ${workspace}
 
-                        echo "Workspace contents:"
-                        ls -la
+                            echo "Current directory:"
+                            pwd
 
-                        echo "Replacing BUILD_NUMBER in app.yaml..."
-                        sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
+                            echo "Workspace contents:"
+                            ls -la
 
-                        echo "Updated app.yaml:"
-                        cat app.yaml
+                            echo "Replacing BUILD_NUMBER in app.yaml..."
+                            sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
 
-                        echo "Shell script executed successfully."
-                        echo "Skipping Kubernetes deployment."
-                    '''
+                            echo "Updated app.yaml:"
+                            cat app.yaml
+
+                            echo "Shell script executed successfully."
+                            echo "Skipping Kubernetes deployment."
+                        """
+                    }
                 }
             }
         }
