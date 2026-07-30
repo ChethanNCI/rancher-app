@@ -57,15 +57,15 @@ EOF
             steps {
                 container('kubectl') {
                     sh """
+                    cd \$WORKSPACE
+
                     kubectl apply -f account.yaml
-                    
+
                     sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
 
-                    kubectl apply -f app.yaml \
-                    -n ${NAMESPACE}
+                    kubectl apply -f app.yaml -n ${NAMESPACE}
 
-                    kubectl rollout status deployment/${DEPLOYMENT} \
-                    -n ${NAMESPACE}
+                    kubectl rollout status deployment/${DEPLOYMENT} -n ${NAMESPACE}
                     """
                 }
             }
