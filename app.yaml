@@ -19,6 +19,8 @@ spec:
         app: rancher-apps
 
     spec:
+      imagePullSecrets:
+        - name: harbor-secret
       serviceAccountName: default
       containers:
         - name: rancher-apps
