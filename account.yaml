@@ -68,8 +68,8 @@ metadata:
   namespace: default
 subjects:
 - kind: ServiceAccount
-  name: jenkins
-  namespace: jenkins
+  name: default
+  namespace: default
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
