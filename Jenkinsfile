@@ -61,15 +61,21 @@ EOF
         }
 
 
-        stage('Test Harbor Connection') {
-
+       stage('Test Harbor Login') {
             steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-jenkins',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )
+                ]) {
 
-                sh '''
-                    echo "Testing Harbor registry connectivity..."
-
-                    curl -k -I http://${REGISTRY}/v2/ || true
-                '''
+                    sh '''
+                    curl -u "$HARBOR_USER:$HARBOR_PASS" \
+                    -I http://44.202.77.70:30002/v2/
+                    '''
+                }
             }
         }
 
