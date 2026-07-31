@@ -19,7 +19,6 @@ pipeline {
 
 
         stage('Checkout') {
-
             steps {
                 echo "Source code checkout completed"
             }
@@ -40,6 +39,9 @@ pipeline {
 
                     sh '''
                         echo "Configuring Harbor authentication..."
+
+                        echo "Harbor user:"
+                        echo "$HARBOR_USER"
 
                         mkdir -p /kaniko/.docker
 
@@ -66,7 +68,8 @@ EOF
         }
 
 
-        stage('Verify Harbor Login') {
+
+        stage('Verify Harbor Authentication') {
 
             steps {
 
@@ -79,7 +82,7 @@ EOF
                 ]) {
 
                     sh '''
-                        echo "Testing Harbor authentication..."
+                        echo "Testing Harbor login..."
 
                         curl \
                         -u "$HARBOR_USER:$HARBOR_PASS" \
@@ -93,27 +96,31 @@ EOF
 
 
 
-        stage('Verify Kaniko Configuration') {
+
+        stage('Verify Kaniko Setup') {
 
             steps {
 
                 sh '''
-
                     echo "Checking Kaniko..."
 
                     ls -la /kaniko
 
-                    echo "Checking Docker auth file..."
+                    echo "Checking Docker config..."
 
                     ls -la /kaniko/.docker
 
 
-                    echo "Docker config:"
-                    cat /kaniko/.docker/config.json | sed 's/"auth": "[^"]*"/"auth": "HIDDEN"/g'
+                    echo "Docker config exists"
+
+                    test -f /kaniko/.docker/config.json
+
+                    echo "Kaniko configuration looks OK"
 
                 '''
             }
         }
+
 
 
 
@@ -123,7 +130,8 @@ EOF
 
                 sh '''
 
-                    echo "Building and pushing image..."
+                    echo "Building image and pushing to Harbor..."
+
 
                     /kaniko/executor \
                       --dockerfile=Dockerfile \
@@ -134,11 +142,12 @@ EOF
                       --verbosity=debug
 
 
-                    echo "Image pushed successfully."
+                    echo "Image push completed"
 
                 '''
             }
         }
+
 
 
 
@@ -150,11 +159,8 @@ EOF
 
                     echo "Updating Kubernetes manifest..."
 
+
                     sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
-
-
-                    echo "Generated Kubernetes manifest:"
-                    cat app.yaml
 
 
                     echo "Deploying application..."
@@ -164,7 +170,6 @@ EOF
                     -n ${NAMESPACE}
 
 
-
                     echo "Waiting for rollout..."
 
                     kubectl rollout status \
@@ -172,13 +177,14 @@ EOF
                     -n ${NAMESPACE}
 
 
-                    echo "Deployment completed successfully."
+                    echo "Deployment completed"
 
                 '''
             }
         }
 
     }
+
 
 
     post {
