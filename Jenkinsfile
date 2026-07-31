@@ -6,6 +6,7 @@ pipeline {
         }
     }
 
+
     environment {
         REGISTRY   = "44.202.77.70:30002"
         IMAGE      = "rancher/myapp"
@@ -18,6 +19,7 @@ pipeline {
 
 
         stage('Checkout') {
+
             steps {
                 echo "Source code checkout completed"
             }
@@ -41,6 +43,7 @@ pipeline {
 
                         mkdir -p /kaniko/.docker
 
+
                         AUTH=$(printf "%s:%s" "$HARBOR_USER" "$HARBOR_PASS" | base64 | tr -d '\\n')
 
 
@@ -63,7 +66,7 @@ EOF
         }
 
 
-        stage('Test Harbor Login') {
+        stage('Verify Harbor Login') {
 
             steps {
 
@@ -90,6 +93,30 @@ EOF
 
 
 
+        stage('Verify Kaniko Configuration') {
+
+            steps {
+
+                sh '''
+
+                    echo "Checking Kaniko..."
+
+                    ls -la /kaniko
+
+                    echo "Checking Docker auth file..."
+
+                    ls -la /kaniko/.docker
+
+
+                    echo "Docker config:"
+                    cat /kaniko/.docker/config.json | sed 's/"auth": "[^"]*"/"auth": "HIDDEN"/g'
+
+                '''
+            }
+        }
+
+
+
         stage('Build and Push Image') {
 
             steps {
@@ -98,13 +125,10 @@ EOF
 
                     echo "Building and pushing image..."
 
-                    ls -la /kaniko/.docker
-
                     /kaniko/executor \
                       --dockerfile=Dockerfile \
                       --context=$WORKSPACE \
                       --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
-                      --docker-cfg=/kaniko/.docker \
                       --insecure \
                       --skip-tls-verify \
                       --verbosity=debug
@@ -162,6 +186,7 @@ EOF
         success {
             echo "Pipeline completed successfully"
         }
+
 
         failure {
             echo "Pipeline failed"
