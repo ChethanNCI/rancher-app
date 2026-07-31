@@ -13,41 +13,40 @@ pipeline {
         NAMESPACE = "default"
     }
 
-    stages {
+    stage('Configure Harbor Auth') {
 
-        stage('Configure Harbor Auth') {
+    steps {
 
-            steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'harbor-jenkins',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+            )
+        ]) {
 
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'harbor-jenkins',
-                        usernameVariable: 'HARBOR_USER',
-                        passwordVariable: 'HARBOR_PASS'
-                    )
-                ]) {
+            sh '''
+                echo "Configuring Harbor authentication..."
 
-                    sh '''
-                        echo "Configuring Harbor authentication..."
+                mkdir -p /kaniko/.docker
 
-                        mkdir -p /kaniko/.docker
+                AUTH=$(echo -n "${HARBOR_USER}:${HARBOR_PASS}" | base64)
 
-                        cat > /kaniko/.docker/config.json <<EOF
+                cat > /kaniko/.docker/config.json <<EOF
 {
   "auths": {
     "${REGISTRY}": {
-      "username": "${HARBOR_USER}",
-      "password": "${HARBOR_PASS}"
+      "auth": "${AUTH}"
     }
   }
 }
 EOF
 
-                        echo "Harbor authentication configured."
-                    '''
-                }
-            }
+                echo "Harbor authentication configured."
+            '''
         }
+    }
+}
 
 
         stage('Build and Push Image') {
