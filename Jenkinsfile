@@ -3,6 +3,7 @@ pipeline {
     agent {
         kubernetes {
             defaultContainer 'jnlp'
+            podRetention never()
         }
     }
 
