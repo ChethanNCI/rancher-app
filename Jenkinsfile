@@ -13,7 +13,9 @@ pipeline {
         NAMESPACE  = "default"
     }
 
+
     stages {
+
 
         stage('Checkout') {
             steps {
@@ -39,7 +41,8 @@ pipeline {
 
                         mkdir -p /kaniko/.docker
 
-                        AUTH=$(echo -n "${HARBOR_USER}:${HARBOR_PASS}" | base64 | tr -d '\\n')
+                        AUTH=$(printf "%s:%s" "$HARBOR_USER" "$HARBOR_PASS" | base64 | tr -d '\\n')
+
 
                         cat > /kaniko/.docker/config.json <<EOF
 {
@@ -51,18 +54,19 @@ pipeline {
 }
 EOF
 
+
                         echo "Harbor authentication configured."
 
-                        echo "Checking Docker auth configuration:"
-                        cat /kaniko/.docker/config.json
                     '''
                 }
             }
         }
 
 
-       stage('Test Harbor Login') {
+        stage('Test Harbor Login') {
+
             steps {
+
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'harbor-jenkins',
@@ -72,12 +76,18 @@ EOF
                 ]) {
 
                     sh '''
-                    curl -u "$HARBOR_USER:$HARBOR_PASS" \
-                    -I http://44.202.77.70:30002/v2/
+                        echo "Testing Harbor authentication..."
+
+                        curl \
+                        -u "$HARBOR_USER:$HARBOR_PASS" \
+                        -I \
+                        http://${REGISTRY}/v2/
+
                     '''
                 }
             }
         }
+
 
 
         stage('Build and Push Image') {
@@ -85,20 +95,27 @@ EOF
             steps {
 
                 sh '''
+
                     echo "Building and pushing image..."
+
+                    ls -la /kaniko/.docker
 
                     /kaniko/executor \
                       --dockerfile=Dockerfile \
                       --context=$WORKSPACE \
                       --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
+                      --docker-cfg=/kaniko/.docker \
                       --insecure \
                       --skip-tls-verify \
-                      --verbosity=info
+                      --verbosity=debug
+
 
                     echo "Image pushed successfully."
+
                 '''
             }
         }
+
 
 
         stage('Deploy Application') {
@@ -106,6 +123,7 @@ EOF
             steps {
 
                 sh '''
+
                     echo "Updating Kubernetes manifest..."
 
                     sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
@@ -117,20 +135,25 @@ EOF
 
                     echo "Deploying application..."
 
-                    kubectl apply -f app.yaml \
-                      -n ${NAMESPACE}
+                    kubectl apply \
+                    -f app.yaml \
+                    -n ${NAMESPACE}
+
 
 
                     echo "Waiting for rollout..."
 
-                    kubectl rollout status deployment/${DEPLOYMENT} \
-                      -n ${NAMESPACE}
+                    kubectl rollout status \
+                    deployment/${DEPLOYMENT} \
+                    -n ${NAMESPACE}
 
 
                     echo "Deployment completed successfully."
+
                 '''
             }
         }
+
     }
 
 
@@ -143,5 +166,7 @@ EOF
         failure {
             echo "Pipeline failed"
         }
+
     }
+
 }
