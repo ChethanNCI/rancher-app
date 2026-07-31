@@ -2,9 +2,13 @@ FROM jenkins/inbound-agent:latest
 
 USER root
 
-# Install tools
+# Install required tools
 RUN apt-get update && \
-    apt-get install -y curl git ca-certificates && \
+    apt-get install -y \
+    curl \
+    git \
+    ca-certificates \
+    bash && \
     rm -rf /var/lib/apt/lists/*
 
 
@@ -14,12 +18,16 @@ RUN curl -LO "https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl" && \
     rm kubectl
 
 
-# Install Kaniko executor
-RUN mkdir -p /kaniko && \
-    curl -L https://github.com/GoogleContainerTools/kaniko/releases/download/v1.23.2/executor-linux-amd64 \
-    -o /kaniko/executor && \
-    chmod +x /kaniko/executor
+# Copy REAL Kaniko executor from official Kaniko image
+COPY --from=gcr.io/kaniko-project/executor:v1.24.0 \
+     /kaniko/executor \
+     /kaniko/executor
 
 
-# Return to Jenkins user
+# Prepare Kaniko for Jenkins user
+RUN chmod +x /kaniko/executor && \
+    mkdir -p /kaniko/.docker && \
+    chown -R jenkins:jenkins /kaniko
+
+
 USER jenkins
