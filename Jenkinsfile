@@ -6,6 +6,7 @@ pipeline {
         }
     }
 
+
     environment {
         REGISTRY   = "44.202.77.70:30002"
         IMAGE      = "rancher/myapp"
@@ -13,9 +14,12 @@ pipeline {
         NAMESPACE  = "default"
     }
 
+
     stages {
 
+
         stage('Checkout') {
+
             steps {
                 echo "Source code checkout completed"
             }
@@ -39,7 +43,9 @@ pipeline {
 
                         mkdir -p /kaniko/.docker
 
-                        AUTH=$(echo -n "${HARBOR_USER}:${HARBOR_PASS}" | base64 | tr -d '\\n')
+
+                        AUTH=$(printf "%s:%s" "$HARBOR_USER" "$HARBOR_PASS" | base64 | tr -d '\\n')
+
 
                         cat > /kaniko/.docker/config.json <<EOF
 {
@@ -51,27 +57,64 @@ pipeline {
 }
 EOF
 
+
                         echo "Harbor authentication configured."
 
-                        echo "Checking Docker auth configuration:"
-                        cat /kaniko/.docker/config.json
                     '''
                 }
             }
         }
 
 
-        stage('Test Harbor Connection') {
+        stage('Verify Harbor Login') {
+
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-jenkins',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )
+                ]) {
+
+                    sh '''
+                        echo "Testing Harbor authentication..."
+
+                        curl \
+                        -u "$HARBOR_USER:$HARBOR_PASS" \
+                        -I \
+                        http://${REGISTRY}/v2/
+
+                    '''
+                }
+            }
+        }
+
+
+
+        stage('Verify Kaniko Configuration') {
 
             steps {
 
                 sh '''
-                    echo "Testing Harbor registry connectivity..."
 
-                    curl -k -I http://${REGISTRY}/v2/ || true
+                    echo "Checking Kaniko..."
+
+                    ls -la /kaniko
+
+                    echo "Checking Docker auth file..."
+
+                    ls -la /kaniko/.docker
+
+
+                    echo "Docker config:"
+                    cat /kaniko/.docker/config.json | sed 's/"auth": "[^"]*"/"auth": "HIDDEN"/g'
+
                 '''
             }
         }
+
 
 
         stage('Build and Push Image') {
@@ -79,6 +122,7 @@ EOF
             steps {
 
                 sh '''
+
                     echo "Building and pushing image..."
 
                     /kaniko/executor \
@@ -87,12 +131,15 @@ EOF
                       --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
                       --insecure \
                       --skip-tls-verify \
-                      --verbosity=info
+                      --verbosity=debug
+
 
                     echo "Image pushed successfully."
+
                 '''
             }
         }
+
 
 
         stage('Deploy Application') {
@@ -100,6 +147,7 @@ EOF
             steps {
 
                 sh '''
+
                     echo "Updating Kubernetes manifest..."
 
                     sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
@@ -111,20 +159,25 @@ EOF
 
                     echo "Deploying application..."
 
-                    kubectl apply -f app.yaml \
-                      -n ${NAMESPACE}
+                    kubectl apply \
+                    -f app.yaml \
+                    -n ${NAMESPACE}
+
 
 
                     echo "Waiting for rollout..."
 
-                    kubectl rollout status deployment/${DEPLOYMENT} \
-                      -n ${NAMESPACE}
+                    kubectl rollout status \
+                    deployment/${DEPLOYMENT} \
+                    -n ${NAMESPACE}
 
 
                     echo "Deployment completed successfully."
+
                 '''
             }
         }
+
     }
 
 
@@ -134,8 +187,11 @@ EOF
             echo "Pipeline completed successfully"
         }
 
+
         failure {
             echo "Pipeline failed"
         }
+
     }
+
 }
