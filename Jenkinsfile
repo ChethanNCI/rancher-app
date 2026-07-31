@@ -1,7 +1,8 @@
 pipeline {
+
     agent {
         kubernetes {
-            defaultContainer 'kaniko'
+            defaultContainer 'jnlp'
         }
     }
 
@@ -15,7 +16,9 @@ pipeline {
     stages {
 
         stage('Configure Harbor Auth') {
+
             steps {
+
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'harbor-jenkins',
@@ -23,7 +26,10 @@ pipeline {
                         passwordVariable: 'HARBOR_PASS'
                     )
                 ]) {
+
                     sh '''
+                        echo "Configuring Harbor authentication..."
+
                         mkdir -p /kaniko/.docker
 
                         cat > /kaniko/.docker/config.json <<EOF
@@ -36,49 +42,61 @@ pipeline {
   }
 }
 EOF
+
+                        echo "Harbor authentication configured."
                     '''
                 }
             }
         }
 
-        stage('Build and Push') {
+
+        stage('Build and Push Image') {
+
             steps {
+
                 sh '''
+                    echo "Building and pushing image..."
+
                     /kaniko/executor \
                       --dockerfile=Dockerfile \
                       --context=$WORKSPACE \
                       --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
                       --insecure
+
+                    echo "Image pushed successfully."
                 '''
             }
         }
 
-        stage('Test Deploy Script') {
+
+        stage('Deploy Application') {
+
             steps {
-                container('kubectl') {
-                    script {
-                        def workspace = pwd()
 
-                        sh """
-                            cd ${workspace}
+                sh '''
+                    echo "Updating Kubernetes manifest..."
 
-                            echo "Current directory:"
-                            pwd
+                    sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
 
-                            echo "Workspace contents:"
-                            ls -la
 
-                            echo "Replacing BUILD_NUMBER in app.yaml..."
-                            sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" app.yaml
+                    echo "Generated Kubernetes manifest:"
+                    cat app.yaml
 
-                            echo "Updated app.yaml:"
-                            cat app.yaml
 
-                            echo "Shell script executed successfully."
-                            echo "Skipping Kubernetes deployment."
-                        """
-                    }
-                }
+                    echo "Deploying application..."
+
+                    kubectl apply -f app.yaml \
+                      -n ${NAMESPACE}
+
+
+                    echo "Waiting for rollout..."
+
+                    kubectl rollout status deployment/${DEPLOYMENT} \
+                      -n ${NAMESPACE}
+
+
+                    echo "Deployment completed successfully."
+                '''
             }
         }
     }
