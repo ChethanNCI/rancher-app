@@ -7,32 +7,41 @@ pipeline {
     }
 
     environment {
-        REGISTRY = "44.202.77.70:30002"
-        IMAGE = "rancher/myapp"
+        REGISTRY   = "44.202.77.70:30002"
+        IMAGE      = "rancher/myapp"
         DEPLOYMENT = "rancher-apps"
-        NAMESPACE = "default"
+        NAMESPACE  = "default"
     }
 
-    stage('Configure Harbor Auth') {
+    stages {
 
-    steps {
+        stage('Checkout') {
+            steps {
+                echo "Source code checkout completed"
+            }
+        }
 
-        withCredentials([
-            usernamePassword(
-                credentialsId: 'harbor-jenkins',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-            )
-        ]) {
 
-            sh '''
-                echo "Configuring Harbor authentication..."
+        stage('Configure Harbor Auth') {
 
-                mkdir -p /kaniko/.docker
+            steps {
 
-                AUTH=$(echo -n "${HARBOR_USER}:${HARBOR_PASS}" | base64)
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-jenkins',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )
+                ]) {
 
-                cat > /kaniko/.docker/config.json <<EOF
+                    sh '''
+                        echo "Configuring Harbor authentication..."
+
+                        mkdir -p /kaniko/.docker
+
+                        AUTH=$(echo -n "${HARBOR_USER}:${HARBOR_PASS}" | base64 | tr -d '\\n')
+
+                        cat > /kaniko/.docker/config.json <<EOF
 {
   "auths": {
     "${REGISTRY}": {
@@ -42,11 +51,27 @@ pipeline {
 }
 EOF
 
-                echo "Harbor authentication configured."
-            '''
+                        echo "Harbor authentication configured."
+
+                        echo "Checking Docker auth configuration:"
+                        cat /kaniko/.docker/config.json
+                    '''
+                }
+            }
         }
-    }
-}
+
+
+        stage('Test Harbor Connection') {
+
+            steps {
+
+                sh '''
+                    echo "Testing Harbor registry connectivity..."
+
+                    curl -k -I http://${REGISTRY}/v2/ || true
+                '''
+            }
+        }
 
 
         stage('Build and Push Image') {
@@ -60,7 +85,9 @@ EOF
                       --dockerfile=Dockerfile \
                       --context=$WORKSPACE \
                       --destination=$REGISTRY/$IMAGE:$BUILD_NUMBER \
-                      --insecure
+                      --insecure \
+                      --skip-tls-verify \
+                      --verbosity=info
 
                     echo "Image pushed successfully."
                 '''
@@ -97,6 +124,18 @@ EOF
                     echo "Deployment completed successfully."
                 '''
             }
+        }
+    }
+
+
+    post {
+
+        success {
+            echo "Pipeline completed successfully"
+        }
+
+        failure {
+            echo "Pipeline failed"
         }
     }
 }
